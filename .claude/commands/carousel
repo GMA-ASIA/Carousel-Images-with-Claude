@@ -1,0 +1,346 @@
+# Instagram Carousel
+
+Generate a branded Instagram carousel. Request: $ARGUMENTS
+
+---
+
+## 🔧 Quick Customization Checklist
+
+Before using this command, replace the following placeholders throughout this file:
+
+- `{BRAND_NAME}` → Your brand name (e.g., "Acme Studio")
+- `{BRAND_HANDLE}` → Your IG handle (e.g., "@acme.studio")
+- `{BRAND_DOMAIN}` → Your website (e.g., "acme.com")
+- `{PRIMARY_LANGUAGE}` → Default language code (e.g., "en", "zh", "es")
+- `{SECONDARY_LANGUAGE_PREFIX}` → Trigger word for second language (e.g., "zh", "es")
+- `{SECONDARY_LANGUAGE_VOICE}` → Voice description (e.g., "Traditional Chinese, Cantonese voice")
+- `{BRAND_COLOR_PALETTE_NOTE}` → Short description of your brand palette
+- `{KNOWN_TOOLS_DOMAIN_LIST}` → Edit the official-domains list to match your niche
+
+---
+
+## Input Parsing
+
+Parse `$ARGUMENTS` to determine the input type:
+
+- Starts with `{SECONDARY_LANGUAGE_PREFIX} ` → set `language = "{SECONDARY_LANGUAGE_PREFIX}"`, strip the prefix, write in {SECONDARY_LANGUAGE_VOICE}
+- YouTube URL (contains `youtube.com` or `youtu.be`): Pull transcript, extract key insights
+- Topic string (anything else): Research the topic, write original content
+
+If no arguments, ask the user what topic and language they want a carousel about.
+
+---
+
+## Pipeline
+
+Run stages 1-3 automatically, then STOP for user approval before rendering.
+
+### 1. INPUT
+
+If YouTube URL:
+- Extract the video ID from the URL
+- Pull transcript using `youtube-transcript-api`:
+  ```bash
+  cd "$CLAUDE_PROJECT_DIR" && .venv/bin/python3 -c "
+  from youtube_transcript_api import YouTubeTranscriptApi
+  ytt = YouTubeTranscriptApi()
+  transcript = ytt.fetch('<VIDEO_ID>')
+  text = ' '.join([s.text for s in transcript.snippets])
+  print(text)
+  "
+  ```
+- Extract the video title and transcript text
+
+If topic string:
+- Use the topic directly as the content brief
+
+### 2. RESEARCH + AUTONOMOUS IMAGE SOURCING
+
+#### 2a — Slide plan
+
+Design 5–8 slides following this structure AND rhythm:
+
+| Slide | Type | Theme | Purpose |
+|---|---|---|---|
+| 1 | `hook` | DARK | Bold claim, category label, subtitle, optional pills |
+| 2 | `body` | LIGHT | First key idea — context or definition |
+| 3 | `body` | LIGHT or DARK | Second key idea |
+| 4 | `body` | DARK | Mid-carousel anchor (strongest insight or comparison) |
+| 5 | `body` | LIGHT | Supporting detail or example |
+| N | `cta` | DARK | Headshot + name + follow CTA |
+
+Rhythm rule: never place more than 2 LIGHT slides in a row. Hook and CTA are always DARK.
+
+Per-slide content rules:
+- Every slide MUST have a `label` (category tag, e.g. `"WHAT IS IT"`, `"OLD WAY VS NEW WAY"`)
+- Every slide MUST declare its `"theme": "dark"` or `"theme": "light"` in config
+- Every body/hook slide MUST have a `title` or strong `text` block
+- Mix 2 content block types max per body slide
+- Use `*asterisks*` around 1–2 key words per slide (3 is the absolute max)
+- The strongest slides are sparse — label + headline + one content block
+
+Content block selection guide: (pills, comparison, card, code_block, image, bullets)
+
+Step 2b — Automatic Image Planning:
+
+For each slide, decide the image type based on content:
+
+| Slide Content | Auto-Select Image Type |
+|---|---|
+| Tool mention | Official product screenshot or logo |
+| Workflow/process | Diagram, flowchart, or UI screenshot |
+| Comparison | Side-by-side product logos |
+| Stat/data point | Relevant abstract/tech imagery or chart |
+| Concept/abstract idea | Clean stock photo (Unsplash/Pexels) |
+| Person/team mention | Avoid (use text-only slide instead) |
+| Quote/testimonial | Text-only (no image) |
+| News/announcement | Official announcement hero image |
+
+Step 2c — Autonomous Search Strategy:
+
+For each image needed, execute this search cascade:
+
+1. First attempt — Official sources:
+   ```
+   WebSearch: "<product name> official screenshot site:<likely-official-domain>"
+   ```
+   Maintain a list of official domains relevant to YOUR niche. Examples (edit for your industry):
+   - ChatGPT → openai.com
+   - Claude → anthropic.com / claude.com
+   - Notion → notion.so
+   - Figma → figma.com
+   - {ADD_YOUR_NICHE_TOOLS}
+
+2. Second attempt — Press kits & brand assets:
+   ```
+   WebSearch: "<product name> press kit OR brand assets OR media kit"
+   ```
+
+3. Third attempt — Free stock sources:
+   ```
+   WebSearch: "<concept> site:unsplash.com"
+   WebSearch: "<concept> site:pexels.com"
+   ```
+
+4. Fourth attempt — General web with quality filter:
+   ```
+   WebSearch: "<topic> high resolution image"
+   ```
+   Then filter results for: official domains, .png/.jpg URLs, minimum 1080px indicators
+
+Step 2d — Image Evaluation Checklist:
+
+Before downloading, verify each image:
+- [ ] Source is reputable (official site > stock photo > random blog)
+- [ ] Resolution indicator suggests ≥1080px
+- [ ] Not watermarked (Getty, Shutterstock = skip)
+- [ ] Not AI-generated deepfake or fake screenshot
+- [ ] Matches the slide's message (relevant, not just decorative)
+
+Step 2e — Download & Log:
+
+Download each selected image:
+```bash
+curl -L -o "carousels/workspace/<name>/reference/<descriptive-name>.jpg" "<image-url>"
+```
+
+Create `reference/SOURCES.md` logging every download with: source URL, license, photographer (if any), download date.
+
+Step 2f — Fallback Strategy:
+
+If no suitable image found after all 4 search attempts:
+1. Note it in the slide plan: "⚠️ No image found — using text-only layout"
+2. Suggest the user provide one, OR
+3. Generate a stronger text-only slide with bold typography
+4. NEVER use a low-quality or irrelevant image just to fill space
+
+Step 2g — Quality Standards (Non-Negotiable):
+
+- Minimum 1080px on shortest side
+- Prefer PNG for UI/logos, JPG for photos
+- {BRAND_COLOR_PALETTE_NOTE} — prefer images that complement your palette
+- Clean, on-brand aesthetic (matches `brand/visual-social-media-design.md`)
+- No clichéd stock photos (handshakes, people pointing at screens, etc.)
+
+### 3. WRITE + PREVIEW
+
+Structure the content into carousel slides, then present a text preview for the user to approve before rendering.
+
+Slide 1 (hook): Bold, attention-grabbing statement. 1-2 sentences max. Must always have an image (YouTube thumbnail, product screenshot, or relevant hero image). Optional subtitle for secondary context.
+
+Slides 2-7 (body): Mix of:
+- Text-only slides for key statements
+- Bullet slides for lists/comparisons (max 4 bullets per slide)
+- Image slides for visual evidence
+- Use section titles to create structure
+- Use `*asterisks*` around keywords to highlight in accent color
+
+Last slide (CTA): Call to action with `button_text` (e.g., "Follow for more")
+
+Rules:
+- 5-8 slides total (including hook and CTA)
+- Hook slide must always have an image (never text-only)
+- Every 2nd-3rd slide should have an image
+- Keep text concise — people swipe, not read
+- Max ~150 characters per text block
+- Max 4 bullets per slide
+- Body text renders bold — write accordingly (short, punchy lines)
+
+>>> STOP HERE. Present the slide plan to the user as a numbered list:
+
+```
+Slide 1 (hook): "Hook text here"
+  - Image: description of what image will be used
+  - Annotation: "annotation text"
+
+Slide 2 (body): Title: "Section Title"
+  - Text: "Body text here"
+  - Bullets: ["bullet 1", "bullet 2"]
+  - Image: description
+  ...
+
+Slide N (cta): "CTA text"
+  - Button: "Follow for more"
+```
+
+Ask: "Here's the slide plan. Want me to change anything before I render?"
+
+Wait for the user to approve or request changes. Iterate on the text plan until they're happy.
+
+### 4. CONFIG + IMAGES
+
+After user approves the slide plan:
+
+- Create the workspace directory: `carousels/workspace/<carousel-name>/`
+- Download any reference images needed
+- Generate `config.json` (see Config Schema below)
+
+### 5. RENDER
+
+```bash
+cd "$CLAUDE_PROJECT_DIR"
+python3 carousels/render.py "carousels/workspace/<carousel-name>"
+```
+
+### 6. REVIEW
+
+After rendering, read each slide PNG and display them to the user.
+
+Present a summary:
+- Total slides
+- Slide-by-slide breakdown (type, has image, text preview)
+- Ask: "Happy with this? Any changes needed?"
+
+If changes requested:
+- Edit the config.json as needed
+- Add/swap/regenerate images in reference/ if needed
+- Re-run the render script
+- Show updated slides
+
+---
+
+## Config Schema
+
+File: `workspace/<carousel-name>/config.json`
+
+```json
+{
+  "title": "Carousel Title",
+  "language": "{PRIMARY_LANGUAGE}",
+  "profile": {
+    "display_name": "{BRAND_NAME}",
+    "handle": "{BRAND_HANDLE}"
+  },
+  "slides": [
+    {
+      "type": "hook",
+      "theme": "dark",
+      "label": "JUST LAUNCHED",
+      "text": "Headline with *accent words*.",
+      "subtitle": "Optional secondary context line.",
+      "pills": ["Tool A", "Tool B", "Tool C"],
+      "pills_active": 2
+    },
+    {
+      "type": "body",
+      "theme": "light",
+      "label": "WHAT IS IT",
+      "title": "First key idea *here*.",
+      "text": "Supporting body sentence.",
+      "code_block": [
+        ["Keyword", "explanation text"],
+        ["Keyword", "explanation text"]
+      ]
+    },
+    {
+      "type": "body",
+      "theme": "light",
+      "label": "OLD WAY VS NEW WAY",
+      "title": "The shift in *one line*.",
+      "comparison": {
+        "old": { "label": "OLD WAY", "text": "Description of the old approach." },
+        "new": { "label": "NEW WAY", "text": "Description of the new approach." }
+      }
+    },
+    {
+      "type": "body",
+      "theme": "dark",
+      "label": "KEY INSIGHT",
+      "title": "The core takeaway *in bold*.",
+      "text": "Single supporting sentence."
+    },
+    {
+      "type": "body",
+      "theme": "light",
+      "label": "WHO SHOULD CARE",
+      "title": "Who *this matters for*.",
+      "bullets": [
+        "Audience segment 1",
+        "Audience segment 2",
+        "Audience segment 3"
+      ]
+    },
+    {
+      "type": "cta",
+      "theme": "dark",
+      "text": "Follow for more {YOUR_NICHE} drops",
+      "button_text": "Follow {BRAND_HANDLE}"
+    }
+  ]
+}
+```
+
+### Slide Types
+
+| Type | Purpose | Fields |
+|------|---------|--------|
+| `hook` | First slide, grabs attention | `text` (required), `image` (required), `subtitle` (optional), `annotation` (optional) |
+| `body` | Content slides | `text`, `title`, `bullets`, `image`, `annotation` (all optional, at least one required) |
+| `cta` | Last slide, call to action | `text` (required), `button_text` (optional) |
+
+### Field Notes
+
+- `language`: language code — affects font stack and footer copy localization
+- `image`: filename relative to `reference/` directory, or `asset:<filename>` to load from the shared `assets/` folder
+- `title`: rendered uppercase with accent underline bar (Latin scripts only)
+- `text`: supports `*accent words*` syntax for colored highlighting
+- `subtitle`: hook slides only, rendered smaller in muted color below the main text
+- `bullets`: array of strings with `*accent*` support, rendered with colored dots
+- `button_text`: renders a gradient pill button on CTA slide
+- `annotation`: handwritten-style text with curved arrow pointing toward content
+
+---
+
+## Voice & Tone
+
+When writing carousel content, aim for:
+- Direct, confident, no fluff
+- Data-driven when possible (specific numbers > vague claims)
+- Slightly provocative hooks that challenge assumptions
+- Educational but not preachy
+- Short sentences, clear structure
+
+> Customize this section to match your brand voice. See `brand/tov-social-media.md` for your specific tone-of-voice rules.
+
+
+
